@@ -223,9 +223,9 @@
         // ═══════════════════════════════════════
         const SB_URL = 'TU_URL_SUPABASE';
         const SB_KEY = 'TU_KEY_SUPABASE';
-        let supabase = null;
+        let sbClient = null;
         if (SB_URL.startsWith('http')) {
-            supabase = window.supabase.createClient(SB_URL, SB_KEY);
+            sbClient = window.supabase.createClient(SB_URL, SB_KEY);
             document.getElementById('dbStatus').textContent = 'Base de Datos: Online';
             document.getElementById('dbStatus').style.color = '#00d4aa';
         }
@@ -396,8 +396,8 @@
         // ═══════════════════════════════════════
         async function processCode(code) {
             let product = null;
-            if (supabase) {
-                const { data } = await supabase.from('productos').select('*').eq('codigo_barras', code).single();
+            if (sbClient) {
+                const { data } = await sbClient.from('productos').select('*').eq('codigo_barras', code).single();
                 product = data;
             } else {
                 const db = JSON.parse(localStorage.getItem('pos_db') || '[]');
@@ -473,8 +473,8 @@
             const precio = parseFloat(document.getElementById('newPrice').value);
             const prod = { id: 'local_' + Date.now(), nombre, precio, codigo_barras: code };
 
-            if (supabase) {
-                const { data } = await supabase.from('productos').insert([prod]).select().single();
+            if (sbClient) {
+                const { data } = await sbClient.from('productos').insert([prod]).select().single();
                 if (data) prod.id = data.id;
             } else {
                 const db = JSON.parse(localStorage.getItem('pos_db') || '[]');
@@ -504,8 +504,8 @@
             const total = cart.reduce((a, b) => a + b.precio * b.qty, 0);
             if (!confirm(`¿Confirmar venta por $${total.toFixed(2)}?`)) return;
 
-            if (supabase) {
-                const { data: venta } = await supabase
+            if (sbClient) {
+                const { data: venta } = await sbClient
                     .from('ventas').insert([{ total, fecha: new Date().toISOString() }])
                     .select().single();
                 if (venta) {
@@ -513,7 +513,7 @@
                         venta_id: venta.id, producto_id: item.id,
                         cantidad: item.qty, precio_unitario: item.precio
                     }));
-                    await supabase.from('detalle_venta').insert(detalles);
+                    await sbClient.from('detalle_venta').insert(detalles);
                 }
             }
 
