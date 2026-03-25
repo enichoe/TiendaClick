@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS System - Punto de Venta</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#0a0f0d',
+                        surface: '#141a17',
+                        card: '#1c2420',
+                        border: '#2a3530',
+                        muted: '#6b7c74',
+                        fg: '#e8ede9',
+                        accent: '#00d4aa',
+                        accentDark: '#00a888',
+                        danger: '#ff4757',
+                        warning: '#ffa502'
+                    },
+                    fontFamily: {
+                        display: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #0a0f0d;
+            --surface: #141a17;
+            --card: #1c2420;
+            --border: #2a3530;
+            --muted: #6b7c74;
+            --fg: #e8ede9;
+            --accent: #00d4aa;
+            --accent-dark: #00a888;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background atmosphere */
+        .bg-atmosphere {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 20% 0%, rgba(0, 212, 170, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0, 168, 136, 0.06) 0%, transparent 50%),
+                linear-gradient(180deg, var(--bg) 0%, #0d1210 100%);
+        }
+
+        /* Grid pattern overlay */
+        .grid-pattern {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.03;
+            background-image: 
+                linear-gradient(var(--accent) 1px, transparent 1px),
+                linear-gradient(90deg, var(--accent) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* Scanner styles */
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .scanner-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .scan-region {
+            width: 70%;
+            height: 80px;
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 212, 170, 0.3);
+        }
+
+        .scan-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            animation: scanLine 2s ease-in-out infinite;
+        }
+
+        @keyframes scanLine {
+            0%, 100% { top: 10%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            50% { top: 90%; }
+        }
+
+        .scanner-corners::before,
+        .scanner-corners::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: var(--accent);
+            border-style: solid;
+        }
+
+        .scanner-corners::before {
+            top: -2px;
+            left: -2px;
+            border-width: 3px 0 0 3px;
+            border-radius: 8px 0 0 0;
+        }
+
+        .scanner-corners::after {
+            bottom: -2px;
+            right: -2px;
+            border-width: 0 3px 3px 0;
+            border-radius: 0 0 8px 0;
+        }
+
+        /* Button styles */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+            color: #000;
+            font-weight: 600;
+            padding: 14px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+            transform: translateX(-100%);
+            transition: transform 0.4s ease;
+        }
+
+        .btn-primary:hover::before {
+            transform: translateX(100%);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 212, 170, 0.35);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--card);
+            color: var(--fg);
+            border: 1px solid var(--border);
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            border-color: var(--accent);
+        }
+
+        .btn-danger {
+            background: rgba(255, 71, 87, 0.15);
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 71, 87, 0.25);
+            border-color: #ff4757;
+        }
+
+        /* Card styles */
+        .glass-card {
+            background: rgba(28, 36, 32, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        /* Cart item animation */
+        .cart-item {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Modal styles */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-backdrop.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            z-index: 101;
+            width: 90%;
+            max-width: 440px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-backdrop.active + .modal-content,
+        .modal-content.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Input styles */
+        .input-field {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.15);
+        }
+
+        .input-field::placeholder {
+            color: var(--muted);
+        }
+
+        /* Quantity controls */
+        .qty-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--fg);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .qty-btn:hover {
+            background: var(--border);
+            border-color: var(--accent);
+        }
+
+        /* Loader */
+        .loader {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Success flash */
+        .success-flash {
+            animation: flashSuccess 0.6s ease;
+        }
+
+        @keyframes flashSuccess {
+            0%, 100% { background: transparent; }
+            50% { background: rgba(0, 212, 170, 0.2); }
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 24px;
+            z-index: 200;
+            opacity: 0;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.success {
+            border-color: var(--accent);
+        }
+
+        .toast.error {
+            border-color: #ff4757;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .scanner-container {
+                height: 220px;
+            }
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Stagger animation for list items */
+        .stagger-item {
+            opacity: 0;
+            animation: fadeUp 0.4s ease forwards;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Pulse animation for scan button */
+        .pulse-ring {
+            position: absolute;
+            inset: -4px;
+            border: 2px solid var(--accent);
+            border-radius: 14px;
+            animation: pulseRing 2s ease-out infinite;
+        }
+
+        @keyframes pulseRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: var(--muted);
+        }
+
+        /* Status indicator */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background atmosphere -->
+    <div class="bg-atmosphere"></div>
+    <div class="grid-pattern"></div>
+
+    <!-- Main container -->
+    <div class="relative z-10 min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-50 backdrop-blur-xl bg-bg/80 border-b border-border">
+            <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accentDark flex items-center justify-center">
+                        <svg class="w-5 h-5 text-bg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-display font-bold text-lg text-fg">POS System</h1>
+                        <div class="flex items-center gap-2 text-xs text-muted">
+                            <span class="status-dot"></span>
+                            <span id="connectionStatus">Conectado</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-muted font-mono" id="currentTime"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="max-w-7xl mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- Left Panel: Scanner -->
+                <div class="space-y-5">
+                    <!-- Scanner Section -->
+                    <section class="glass-card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="font-display font-semibold text-lg">Escanear Producto</h2>
+                            <span id="scannerStatus" class="text-sm text-muted font-mono">Inactivo</span>
+                        </div>
+                        
+                        <!-- Scanner viewport -->
+                        <div id="scannerContainer" class="scanner-container mb-4 bg-surface flex items-center justify-center">
+                            <div id="scannerPlaceholder" class="text-center text-muted">
+                                <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                <p class="text-sm">Presiona para iniciar escaner</p>
+                            </div>
+                            <div class="scanner-overlay hidden" id="scannerOverlay">
+                                <div class="scan-region scanner-corners">
+                                    <div class="scan-line"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scan button -->
+                        <button id="scanBtn" class="btn-primary w-full text-lg relative" onclick="toggleScanner()">
+                            <span class="pulse-ring" id="pulseRing" style="display: none;"></span>
+                            <span id="scanBtnText">Iniciar Escaner</span>
+                        </button>
+
+                        <!-- Manual input -->
+                        <div class="mt-4 pt-4 border-t border-border">
+                            <label class="text-sm text-muted mb-2 block">O ingresa codigo manualmente:</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="manualCode" class="input-field font-mono" placeholder="Codigo de barras...">
+                                <button onclick="processManualCode()" class="btn-secondary whitespace-nowrap">Buscar</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Recent scans -->
+                    <section class="glass-card p-5">
+                        <h3 class="font-display font-semibold mb-4">Escaneos Recientes</h3>
+                        <div id="recentScans" class="space-y-2 max-h-40 overflow-y-auto">
+                            <p class="text-muted text-sm text-center py-4">No hay escaneos recientes</p>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Panel: Cart -->
+                <div class="space-y-5">
+                    <!-- Cart Section -->
+                    <section class="glass-card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="font-display font-semibold text-lg">Carrito de Compras</h2>
+                            <span id="cartCount" class="bg-accent/20 text-accent px-3 py-1 rounded-full text-sm font-mono">0 items</span>
+                        </div>
+
+                        <!-- Cart items -->
+                        <div id="cartItems" class="space-y-3 max-h-[400px] overflow-y-auto mb-4">
+                            <div class="empty-state" id="emptyCart">
+                                <svg class="w-20 h-20 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                                <p class="text-lg font-medium mb-1">Carrito vacio</p>
+                                <p class="text-sm">Escanea productos para agregar</p>
+                            </div>
+                        </div>
+
+                        <!-- Cart summary -->
+                        <div id="cartSummary" class="border-t border-border pt-4 hidden">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-muted">Subtotal</span>
+                                <span id="subtotal" class="font-mono">$0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-muted">IVA (16%)</span>
+                                <span id="tax" class="font-mono">$0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xl font-bold mb-4">
+                                <span>Total</span>
+                                <span id="total" class="text-accent font-mono">$0.00</span>
+                            </div>
+                            <button onclick="finalizeSale()" class="btn-primary w-full text-lg">
+                                Finalizar Venta
+                            </button>
+                            <button onclick="clearCart()" class="btn-danger w-full mt-3">
+                                Vaciar Carrito
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Product Modal -->
+    <div id="productModalBackdrop" class="modal-backdrop" onclick="closeProductModal()"></div>
+    <div id="productModal" class="modal-content glass-card p-6">
+        <h3 class="font-display font-bold text-xl mb-2">Nuevo Producto</h3>
+        <p class="text-muted text-sm mb-5">El codigo <span id="newProductCode" class="font-mono text-accent"></span> no existe. Registra el producto:</p>
+        
+        <form id="newProductForm" onsubmit="saveNewProduct(event)">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-muted mb-2 block">Nombre del producto</label>
+                    <input type="text" id="productName" class="input-field" placeholder="Ej: Coca Cola 600ml" required>
+                </div>
+                <div>
+                    <label class="text-sm text-muted mb-2 block">Precio</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-muted">$</span>
+                        <input type="number" id="productPrice" class="input-field pl-8 font-mono" placeholder="0.00" step="0.01" min="0.01" required>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="closeProductModal()" class="btn-secondary flex-1">Cancelar</button>
+                <button type="submit" class="btn-primary flex-1">Guardar y Agregar</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModalBackdrop" class="modal-backdrop" onclick="closeSuccessModal()"></div>
+    <div id="successModal" class="modal-content glass-card p-8 text-center">
+        <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-accent/20 flex items-center justify-center">
+            <svg class="w-10 h-10 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+        <h3 class="font-display font-bold text-2xl mb-2">Venta Completada</h3>
+        <p class="text-muted mb-2">Total: <span id="saleTotalAmount" class="text-accent font-mono font-bold"></span></p>
+        <p class="text-sm text-muted mb-6">ID: <span id="saleId" class="font-mono"></span></p>
+        <button onclick="closeSuccessModal()" class="btn-primary w-full">Nueva Venta</button>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast">
+        <span id="toastIcon"></span>
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- Loader overlay -->
+    <div id="loaderOverlay" class="fixed inset-0 bg-bg/90 z-[300] flex items-center justify-center hidden">
+        <div class="text-center">
+            <div class="loader mx-auto mb-4"></div>
+            <p class="text-muted" id="loaderText">Procesando...</p>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIGURACION DE SUPABASE
+        // ========================================
+        // IMPORTANTE: Reemplaza con tus credenciales de Supabase
+        const SUPABASE_URL = 'TU_SUPABASE_URL_AQUI';
+        const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
+
+        // Inicializar cliente Supabase
+        let supabase = null;
+        
+        if (SUPABASE_URL !== 'TU_SUPABASE_URL_AQUI' && SUPABASE_ANON_KEY !== 'TU_SUPABASE_ANON_KEY_AQUI') {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
+        // ========================================
+        // ESTADO GLOBAL DE LA APLICACION
+        // ========================================
+        let cart = [];
+        let isScannerActive = false;
+        let currentScanCode = null;
+        let recentScans = [];
+
+        // ========================================
+        // INICIALIZACION
+        // ========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTime();
+            setInterval(updateTime, 1000);
+            checkConnection();
+            
+            // Enter key for manual code
+            document.getElementById('manualCode').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    processManualCode();
+                }
+            });
+        });
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('es-MX', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        async function checkConnection() {
+            if (!supabase) {
+                document.getElementById('connectionStatus').textContent = 'Modo Demo';
+                showToast('Ejecutando en modo demo - Sin conexion a BD', 'warning');
+                return;
+            }
+            
+            try {
+                const { error } = await supabase.from('productos').select('id').limit(1);
+                if (error && error.code !== 'PGRST116') {
+                    document.getElementById('connectionStatus').textContent = 'Error de conexion';
+                    showToast('Error al conectar con la base de datos', 'error');
+                }
+            } catch (e) {
+                document.getElementById('connectionStatus').textContent = 'Desconectado';
+            }
+        }
+
+        // ========================================
+        // FUNCIONES DE ESCANEO
+        // ========================================
+        async function toggleScanner() {
+            if (isScannerActive) {
+                stopScanner();
+            } else {
+                await startScanner();
+            }
+        }
+
+        async function startScanner() {
+            const container = document.getElementById('scannerContainer');
+            const placeholder = document.getElementById('scannerPlaceholder');
+            const overlay = document.getElementById('scannerOverlay');
+            const statusEl = document.getElementById('scannerStatus');
+            const btnText = document.getElementById('scanBtnText');
+            const pulseRing = document.getElementById('pulseRing');
+
+            try {
+                // Request camera permission
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                stream.getTracks().forEach(track => track.stop());
+
+                placeholder.classList.add('hidden');
+                overlay.classList.remove('hidden');
+                statusEl.textContent = 'Activo';
+                statusEl.classList.add('text-accent');
+                btnText.textContent = 'Detener Escaner';
+                pulseRing.style.display = 'block';
+
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: container,
+                        constraints: {
+                            facingMode: "environment",
+                            width: { min: 640, ideal: 1280, max: 1920 },
+                            height: { min: 480, ideal: 720, max: 1080 }
+                        }
+                    },
+                    decoder: {
+                        readers: [
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_128_reader",
+                            "code_39_reader",
+                            "upc_reader",
+                            "upc_e_reader"
+                        ]
+                    },
+                    locate: true,
+                    frequency: 10
+                }, (err) => {
+                    if (err) {
+                        console.error(err);
+                        showToast('Error al iniciar camara: ' + err.message, 'error');
+                        stopScanner();
+                        return;
+                    }
+                    Quagga.start();
+                    isScannerActive = true;
+                });
+
+                Quagga.onDetected(onBarcodeDetected);
+
+            } catch (err) {
+                showToast('No se pudo acceder a la camara', 'error');
+                console.error(err);
+            }
+        }
+
+        function stopScanner() {
+            Quagga.stop();
+            isScannerActive = false;
+
+            const placeholder = document.getElementById('scannerPlaceholder');
+            const overlay = document.getElementById('scannerOverlay');
+            const statusEl = document.getElementById('scannerStatus');
+            const btnText = document.getElementById('scanBtnText');
+            const pulseRing = document.getElementById('pulseRing');
+
+            placeholder.classList.remove('hidden');
+            overlay.classList.add('hidden');
+            statusEl.textContent = 'Inactivo';
+            statusEl.classList.remove('text-accent');
+            btnText.textContent = 'Iniciar Escaner';
+            pulseRing.style.display = 'none';
+        }
+
+        let lastDetectedCode = null;
+        let lastDetectionTime = 0;
+
+        function onBarcodeDetected(result) {
+            const code = result.codeResult.code;
+            const now = Date.now();
+
+            // Debounce: ignore same code within 2 seconds
+            if (code === lastDetectedCode && now - lastDetectionTime < 2000) {
+                return;
+            }
+
+            lastDetectedCode = code;
+            lastDetectionTime = now;
+
+            // Vibrate feedback
+            if (navigator.vibrate) {
+                navigator.vibrate(100);
+            }
+
+            // Visual feedback
+            document.getElementById('scannerContainer').classList.add('success-flash');
+            setTimeout(() => {
+                document.getElementById('scannerContainer').classList.remove('success-flash');
+            }, 600);
+
+            // Add to recent scans
+            addRecentScan(code);
+            
+            // Process the code
+            processBarcode(code);
+        }
+
+        function addRecentScan(code) {
+            const time = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+            recentScans.unshift({ code, time });
+            if (recentScans.length > 5) recentScans.pop();
+            renderRecentScans();
+        }
+
+        function renderRecentScans() {
+            const container = document.getElementById('recentScans');
+            if (recentScans.length === 0) {
+                container.innerHTML = '<p class="text-muted text-sm text-center py-4">No hay escaneos recientes</p>';
+                return;
+            }
+
+            container.innerHTML = recentScans.map((scan, i) => `
+                <div class="flex justify-between items-center p-2 bg-surface rounded-lg stagger-item" style="animation-delay: ${i * 0.05}s">
+                    <span class="font-mono text-sm">${scan.code}</span>
+                    <span class="text-xs text-muted">${scan.time}</span>
+                </div>
+            `).join('');
+        }
+
+        // ========================================
+        // PROCESAMIENTO DE CODIGOS
+        // ========================================
+        async function processManualCode() {
+            const input = document.getElementById('manualCode');
+            const code = input.value.trim();
+            
+            if (!code) {
+                showToast('Ingresa un codigo valido', 'error');
+                return;
+            }
+
+            input.value = '';
+            addRecentScan(code);
+            await processBarcode(code);
+        }
+
+        async function processBarcode(code) {
+            showLoader('Buscando producto...');
+            
+            try {
+                let product = null;
+
+                if (supabase) {
+                    const { data, error } = await supabase
+                        .from('productos')
+                        .select('*')
+                        .eq('codigo_barras', code)
+                        .single();
+
+                    if (!error && data) {
+                        product = data;
+                    }
+                } else {
+                    // Demo mode - check local storage
+                    const demoProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+                    product = demoProducts.find(p => p.codigo_barras === code);
+                }
+
+                hideLoader();
+
+                if (product) {
+                    addToCart(product);
+                    showToast(`${product.nombre} agregado al carrito`, 'success');
+                } else {
+                    // Product doesn't exist - show modal
+                    currentScanCode = code;
+                    showProductModal(code);
+                }
+            } catch (error) {
+                hideLoader();
+                console.error('Error processing barcode:', error);
+                showToast('Error al buscar producto', 'error');
+            }
+        }
+
+        // ========================================
+        // GESTION DEL CARRITO
+        // ========================================
+        function addToCart(product) {
+            const existing = cart.find(item => item.id === product.id);
+            
+            if (existing) {
+                existing.cantidad++;
+            } else {
+                cart.push({
+                    ...product,
+                    cantidad: 1
+                });
+            }
+
+            renderCart();
+        }
+
+        function updateQuantity(productId, delta) {
+            const item = cart.find(i => i.id === productId);
+            if (item) {
+                item.cantidad += delta;
+                if (item.cantidad <= 0) {
+                    removeFromCart(productId);
+                    return;
+                }
+            }
+            renderCart();
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.id !== productId);
+            renderCart();
+        }
+
+        function clearCart() {
+            cart = [];
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cartItems');
+            const emptyState = document.getElementById('emptyCart');
+            const summary = document.getElementById('cartSummary');
+            const countEl = document.getElementById('cartCount');
+
+            const totalItems = cart.reduce((sum, item) => sum + item.cantidad, 0);
+            countEl.textContent = `${totalItems} item${totalItems !== 1 ? 's' : ''}`;
+
+            if (cart.length === 0) {
+                container.innerHTML = '';
+                container.appendChild(emptyState);
+                emptyState.classList.remove('hidden');
+                summary.classList.add('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            summary.classList.remove('hidden');
+
+            container.innerHTML = cart.map((item, index) => `
+                <div class="cart-item bg-surface rounded-xl p-4 stagger-item" style="animation-delay: ${index * 0.05}s">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-medium truncate">${item.nombre}</h4>
+                            <p class="text-sm text-muted font-mono">${formatPrice(item.precio)} c/u</p>
+                        </div>
+                        <button onclick="removeFromCart('${item.id}')" class="text-muted hover:text-danger transition-colors p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <button onclick="updateQuantity('${item.id}', -1)" class="qty-btn">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                                </svg>
+                            </button>
+                            <span class="w-8 text-center font-mono font-medium">${item.cantidad}</span>
+                            <button onclick="updateQuantity('${item.id}', 1)" class="qty-btn">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <span class="font-mono font-semibold text-accent">${formatPrice(item.precio * item.cantidad)}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            updateTotals();
+        }
+
+        function updateTotals() {
+            const subtotal = cart.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+            const tax = subtotal * 0.16;
+            const total = subtotal + tax;
+
+            document.getElementById('subtotal').textContent = formatPrice(subtotal);
+            document.getElementById('tax').textContent = formatPrice(tax);
+            document.getElementById('total').textContent = formatPrice(total);
+        }
+
+        function formatPrice(amount) {
+            return '$' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        // ========================================
+        // MODAL DE NUEVO PRODUCTO
+        // ========================================
+        function showProductModal(code) {
+            currentScanCode = code;
+            document.getElementById('newProductCode').textContent = code;
+            document.getElementById('productModalBackdrop').classList.add('active');
+            document.getElementById('productModal').classList.add('active');
+            document.getElementById('productName').focus();
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModalBackdrop').classList.remove('active');
+            document.getElementById('productModal').classList.remove('active');
+            document.getElementById('newProductForm').reset();
+            currentScanCode = null;
+        }
+
+        async function saveNewProduct(e) {
+            e.preventDefault();
+            
+            const nombre = document.getElementById('productName').value.trim();
+            const precio = parseFloat(document.getElementById('productPrice').value);
+            const codigo = currentScanCode;
+
+            if (!nombre || !precio || !codigo) {
+                showToast('Completa todos los campos', 'error');
+                return;
+            }
+
+            showLoader('Guardando producto...');
+
+            try {
+                const newProduct = {
+                    id: generateUUID(),
+                    nombre,
+                    precio,
+                    codigo_barras: codigo
+                };
+
+                if (supabase) {
+                    const { data, error } = await supabase
+                        .from('productos')
+                        .insert([newProduct])
+                        .select()
+                        .single();
+
+                    if (error) throw error;
+                    
+                    addToCart(data);
+                } else {
+                    // Demo mode - save to localStorage
+                    const demoProducts = JSON.parse(localStorage.getItem('demoProducts') || '[]');
+                    demoProducts.push(newProduct);
+                    localStorage.setItem('demoProducts', JSON.stringify(demoProducts));
+                    
+                    addToCart(newProduct);
+                }
+
+                hideLoader();
+                closeProductModal();
+                showToast('Producto guardado y agregado', 'success');
+
+            } catch (error) {
+                hideLoader();
+                console.error('Error saving product:', error);
+                showToast('Error al guardar producto', 'error');
+            }
+        }
+
+        // ========================================
+        // FINALIZAR VENTA
+        // ========================================
+        async function finalizeSale() {
+            if (cart.length === 0) {
+                showToast('El carrito esta vacio', 'error');
+                return;
+            }
+
+            showLoader('Procesando venta...');
+
+            try {
+                const subtotal = cart.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+                const tax = subtotal * 0.16;
+                const total = subtotal + tax;
+
+                const saleId = generateUUID();
+
+                if (supabase) {
+                    // Create sale
+                    const { error: saleError } = await supabase
+                        .from('ventas')
+                        .insert([{
+                            id: saleId,
+                            fecha: new Date().toISOString(),
+                            total
+                        }]);
+
+                    if (saleError) throw saleError;
+
+                    // Create sale details
+                    const detalles = cart.map(item => ({
+                        id: generateUUID(),
+                        venta_id: saleId,
+                        producto_id: item.id,
+                        cantidad: item.cantidad,
+                        precio_unitario: item.precio
+                    }));
+
+                    const { error: detailError } = await supabase
+                        .from('detalle_venta')
+                        .insert(detalles);
+
+                    if (detailError) throw detailError;
+                }
+
+                hideLoader();
+
+                // Show success modal
+                document.getElementById('saleTotalAmount').textContent = formatPrice(total);
+                document.getElementById('saleId').textContent = saleId.substring(0, 8).toUpperCase();
+                document.getElementById('successModalBackdrop').classList.add('active');
+                document.getElementById('successModal').classList.add('active');
+
+                // Clear cart
+                cart = [];
+                renderCart();
+
+            } catch (error) {
+                hideLoader();
+                console.error('Error finalizing sale:', error);
+                showToast('Error al procesar venta', 'error');
+            }
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModalBackdrop').classList.remove('active');
+            document.getElementById('successModal').classList.remove('active');
+        }
+
+        // ========================================
+        // UTILIDADES
+        // ========================================
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function showLoader(text = 'Procesando...') {
+            document.getElementById('loaderText').textContent = text;
+            document.getElementById('loaderOverlay').classList.remove('hidden');
+        }
+
+        function hideLoader() {
+            document.getElementById('loaderOverlay').classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+
+            msg.textContent = message;
+            toast.className = 'toast ' + type;
+
+            const icons = {
+                success: '<svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+                error: '<svg class="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+                warning: '<svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'
+            };
+
+            icon.innerHTML = icons[type] || icons.info;
+
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
