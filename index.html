@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TiendaClick POS | Escáner Profesional</title>
-    
-    <!-- Dependencias -->
+    <title>TiendaClick POS</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+    <!-- html5-qrcode con versión fija y estable -->
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
-    
+
     <script>
         tailwind.config = {
             theme: {
@@ -21,350 +21,488 @@
                         border: '#2a3530', muted: '#6b7c74', fg: '#e8ede9',
                         accent: '#00d4aa', accentDark: '#00a888', danger: '#ff4757'
                     },
-                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
                 }
             }
         }
     </script>
-    
-    <style>
-        :root { --accent: #00d4aa; --bg: #0a0f0d; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #e8ede9; overflow-x: hidden; }
-        
-        .glass { background: rgba(20, 26, 23, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); }
-        .glow-accent { box-shadow: 0 0 20px rgba(0, 212, 170, 0.2); }
-        
-        /* Contenedor del Escáner Optimizado */
-        #reader { width: 100% !important; border: none !important; border-radius: 16px !important; overflow: hidden !important; background: #000; }
-        #reader video { width: 100% !important; height: 320px !important; object-fit: cover !important; }
-        
-        /* Ocultar elementos de la propia libreria que se ven feos */
-        #reader__dashboard_section_csr button { background: var(--accent) !important; color: black !important; padding: 10px 20px !important; border-radius: 8px !important; text-transform: uppercase; font-weight: bold; border: none !important; cursor: pointer; }
-        #reader__camera_selection { background: #1c2420 !important; border: 1px solid #2a3530 !important; color: white !important; margin: 10px 0 !important; width: 100% !important; border-radius: 8px; padding: 5px; }
-        
-        .btn-action { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        .btn-action:active { transform: scale(0.95); opacity: 0.8; }
-        
-        /* Animación de escaneo exitoso */
-        @keyframes scan-flash {
-            0% { background: rgba(0, 212, 170, 0); }
-            50% { background: rgba(0, 212, 170, 0.3); }
-            100% { background: rgba(0, 212, 170, 0); }
-        }
-        .flash-active { animation: scan-flash 0.5s ease-out; }
 
-        /* Custom Scrollbar */
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    <style>
+        :root { --accent: #00d4aa; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0a0f0d; color: #e8ede9; overflow-x: hidden; }
+        .glass { background: rgba(20, 26, 23, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); }
+        .glow { box-shadow: 0 0 30px rgba(0,212,170,0.25); }
+
+        /* VIDEO DEL SCANNER */
+        #scannerVideo {
+            width: 100%;
+            height: 280px;
+            object-fit: cover;
+            border-radius: 14px;
+            display: block;
+            background: #000;
+        }
+        #scannerCanvas { display: none; }
+
+        /* Animación de línea de escaneo */
+        .scan-line {
+            position: absolute;
+            left: 10%; right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #00d4aa, transparent);
+            border-radius: 2px;
+            animation: scanAnim 2s ease-in-out infinite;
+            box-shadow: 0 0 8px #00d4aa;
+        }
+        @keyframes scanAnim {
+            0%   { top: 15%; opacity: 0; }
+            10%  { opacity: 1; }
+            50%  { top: 80%; }
+            90%  { opacity: 1; }
+            100% { top: 15%; opacity: 0; }
+        }
+
+        /* Esquinas del scanner */
+        .corner { position: absolute; width: 22px; height: 22px; border-color: #00d4aa; border-style: solid; }
+        .tl { top: 10%; left: 10%; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+        .tr { top: 10%; right: 10%; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+        .bl { bottom: 10%; left: 10%; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+        .br { bottom: 10%; right: 10%; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+        .btn { transition: all 0.18s ease; cursor: pointer; }
+        .btn:active { transform: scale(0.96); }
+
+        /* Scrollbar */
+        .sc::-webkit-scrollbar { width: 5px; }
+        .sc::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 5px; }
+
+        /* Modal */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(6px); }
+        .modal.open { display: flex; }
+
+        /* Flash success */
+        @keyframes flash { 0%,100% { opacity:0 } 40%,60% { opacity:1 } }
+        .flash-overlay { animation: flash 0.5s ease-out; }
     </style>
 </head>
-<body class="p-4 md:p-8 min-h-screen">
-    <div id="flashOverlay" class="fixed inset-0 pointer-events-none z-50"></div>
+<body class="min-h-screen p-4 md:p-8">
 
-    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
-        
-        <!-- PANEL IZQUIERDO: SCANNER -->
-        <div class="w-full lg:w-5/12 space-y-6">
-            <div class="flex items-center gap-4 mb-8">
-                <div class="w-14 h-14 bg-accent rounded-2xl flex items-center justify-center shadow-lg glow-accent">
-                    <svg class="w-8 h-8 text-bg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v1m0 11v1m-7-6H4m16 0h-1m-3-5.228a9 9 0 010 12.456M7 7.01a9 9 0 000 9.98M10.12 10.12a3 3 0 010 3.76M13.88 13.88a3 3 0 000-3.76"/></svg>
+    <!-- Flash de éxito al escanear -->
+    <div id="flashEl" class="fixed inset-0 pointer-events-none z-50 bg-accent/20 opacity-0"></div>
+
+    <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8">
+
+        <!-- ══════════ PANEL IZQUIERDO: SCANNER ══════════ -->
+        <div class="w-full lg:w-[45%] flex flex-col gap-6">
+            <!-- Encabezado -->
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center glow shrink-0">
+                    <svg class="w-8 h-8 text-bg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 12h10"/></svg>
                 </div>
                 <div>
-                    <h1 class="text-3xl font-bold tracking-tight">TiendaClick <span class="text-accent">POS</span></h1>
-                    <p id="dbStatus" class="text-xs font-mono uppercase tracking-widest text-muted">Inicializando...</p>
+                    <h1 class="text-2xl font-bold">TiendaClick <span class="text-accent">POS</span></h1>
+                    <p id="dbStatus" class="text-xs font-mono text-orange-400 uppercase tracking-widest">Modo Local</p>
                 </div>
             </div>
 
-            <div class="glass p-6 rounded-3xl relative overflow-hidden">
+            <!-- Tarjeta del Scanner -->
+            <div class="glass rounded-3xl p-5">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold text-lg flex items-center gap-2">
-                        <span id="scanPulse" class="relative flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-accent"></span></span>
-                        Scanner
-                    </h2>
-                    <span id="scanResultLabel" class="text-xs font-mono text-muted tracking-tight">Listo para escanear</span>
+                    <h2 class="font-bold text-lg">Escáner de Productos</h2>
+                    <span id="statusLabel" class="text-xs font-mono text-muted px-3 py-1 bg-white/5 rounded-full">Inactivo</span>
                 </div>
 
-                <div id="reader" class="rounded-2xl bg-black shadow-inner"></div>
+                <!-- Viewport de la cámara -->
+                <div class="relative rounded-2xl overflow-hidden bg-black" style="height: 280px;">
+                    <video id="scannerVideo" autoplay playsinline muted></video>
+                    <canvas id="scannerCanvas"></canvas>
 
-                <div class="grid grid-cols-1 gap-3 mt-6">
-                    <button id="startBtn" onclick="initScanner()" class="btn-action bg-accent text-bg font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-accent/20">
-                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4h3V2H4a2 2 0 0 0-2 2v3h2V4Zm3 16H4v-3H2v3a2 2 0 0 0 2 2h3v-2Zm13-3v3h-3v2h3a2 2 0 0 0 2-2v-3h-2ZM17 4V2h3a2 2 0 0 1 2 2v3h-2V4h-3Zm-7 3h4v2h-4V7Zm0 5h4v2h-4v-2Zm0 5h4v2h-4v-2ZM7 7h1v10H7V7Zm1 0h1v10H8V7Zm2 0h1v10h-1V7Zm2 0h1v10h-1V7Zm2 0h1v10h-1V7Zm2 0h1v10h-1V7Zm1 10h1V7h-1v10Z"></path></svg>
-                        ENCENDER ESCÁNER
+                    <!-- Overlay de escaneo (visible solo cuando la cámara está activa) -->
+                    <div id="scanOverlay" class="absolute inset-0 hidden">
+                        <div class="scan-line"></div>
+                        <div class="corner tl"></div>
+                        <div class="corner tr"></div>
+                        <div class="corner bl"></div>
+                        <div class="corner br"></div>
+                    </div>
+
+                    <!-- Placeholder cuando no hay cámara -->
+                    <div id="scanPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-muted/60">
+                        <svg class="w-16 h-16 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <p class="text-sm font-medium">Presiona "INICIAR" para activar la cámara</p>
+                    </div>
+                </div>
+
+                <!-- Botones de control -->
+                <div class="mt-5 grid grid-cols-2 gap-3">
+                    <button id="btnStart" onclick="startCamera()" class="btn col-span-2 bg-accent text-bg font-black py-5 rounded-2xl text-lg glow flex items-center justify-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        INICIAR CÁMARA
                     </button>
-                    <button id="stopBtn" onclick="stopScanner()" class="btn-action bg-white/5 text-white/40 font-bold py-4 rounded-2xl hidden">DETENER CÁMARA</button>
-                    
-                    <div class="flex gap-2 mt-4 pt-4 border-t border-white/5">
-                        <input type="text" id="manualInput" class="flex-1 bg-surface border border-border rounded-xl px-4 py-3 font-mono text-sm focus:border-accent focus:outline-none" placeholder="Ingreso manual...">
-                        <button onclick="manualSearch()" class="px-6 bg-surface border border-border rounded-xl hover:bg-white/5 transition-colors font-bold uppercase text-xs">BUSCAR</button>
+                    <button id="btnStop" onclick="stopCamera()" class="btn hidden col-span-2 bg-danger/20 text-danger font-bold py-4 rounded-2xl border border-danger/30">
+                        DETENER CÁMARA
+                    </button>
+                </div>
+
+                <!-- Ingreso manual -->
+                <div class="mt-5 pt-5 border-t border-white/5">
+                    <p class="text-xs text-muted font-bold uppercase mb-3 tracking-wider">Ingreso Manual de Código</p>
+                    <div class="flex gap-2">
+                        <input id="manualCode" type="text" onkeydown="if(event.key==='Enter')manualSearch()"
+                               class="flex-1 bg-surface border border-border rounded-xl px-4 py-3 font-mono text-sm focus:border-accent outline-none"
+                               placeholder="Escribe el código...">
+                        <button onclick="manualSearch()" class="btn px-5 bg-surface border border-border rounded-xl font-bold text-xs uppercase hover:border-accent">OK</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- PANEL DERECHO: CARRITO -->
+        <!-- ══════════ PANEL DERECHO: CARRITO ══════════ -->
         <div class="flex-1">
-            <div class="glass h-full rounded-3xl flex flex-col p-6 min-h-[600px]">
-                <div class="flex justify-between items-end mb-8">
-                    <div>
-                        <h2 class="text-2xl font-bold">Carrito de Venta</h2>
-                        <p class="text-muted text-sm" id="cartTimestamp">Lista de productos</p>
-                    </div>
-                    <div class="text-right">
-                        <span id="cartCount" class="bg-accent/10 text-accent px-4 py-2 rounded-xl text-sm font-bold border border-accent/20">0 PRODUCTOS</span>
+            <div class="glass rounded-3xl p-6 flex flex-col" style="min-height: 600px;">
+                <!-- Header del carrito -->
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Carrito de Venta</h2>
+                    <span id="cartCountLabel" class="bg-accent/15 text-accent px-4 py-2 rounded-xl font-bold text-sm border border-accent/20">0 items</span>
+                </div>
+
+                <!-- Lista de productos -->
+                <div id="cartList" class="flex-1 overflow-y-auto sc space-y-3 mb-6" style="max-height: 440px;">
+                    <div id="emptyState" class="flex flex-col items-center justify-center h-56 opacity-30 text-center">
+                        <svg class="w-20 h-20 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <p class="italic text-sm">El carrito está vacío</p>
                     </div>
                 </div>
 
-                <div id="cartList" class="flex-1 space-y-4 overflow-y-auto pr-2 custom-scroll max-h-[450px]">
-                    <div class="flex flex-col items-center justify-center h-64 text-center opacity-30">
-                        <svg class="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        <p class="italic">Esperando escaneo...</p>
+                <!-- Totales y botón de pago -->
+                <div class="border-t border-white/6 pt-6">
+                    <div class="flex justify-between text-muted mb-2 text-sm">
+                        <span>Subtotal</span>
+                        <span id="subtotalVal" class="font-mono">$0.00</span>
                     </div>
-                </div>
-
-                <div class="mt-8 pt-8 border-t border-white/5">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="text-muted font-bold text-sm tracking-widest uppercase">Total a Cobrar</div>
-                        <div id="totalDisplay" class="text-5xl font-bold text-accent tracking-tighter font-mono">$0.00</div>
+                    <div class="flex justify-between items-baseline mb-6">
+                        <span class="text-muted font-bold uppercase tracking-widest text-xs">Total</span>
+                        <span id="totalVal" class="text-4xl font-black text-accent font-mono">$0.00</span>
                     </div>
-                    <button onclick="finalizeSale()" class="btn-action w-full py-6 bg-accent text-bg rounded-2xl text-xl font-black shadow-[0_0_30px_rgba(0,212,170,0.3)]">FINALIZAR COMPRA</button>
+                    <button onclick="finalizeSale()" class="btn w-full py-5 bg-accent text-bg font-black text-xl rounded-2xl glow">COBRAR</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: REGISTRO RÁPIDO -->
-    <div id="modalNew" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-        <div class="glass w-full max-w-lg p-8 rounded-[40px] shadow-2xl">
-            <h3 class="text-3xl font-bold mb-2">Producto No Registrado</h3>
-            <p class="text-muted mb-8 italic">Código detectado: <span id="newCodeLabel" class="text-accent font-mono font-bold"></span></p>
-            
-            <form onsubmit="saveProduct(event)" class="space-y-5">
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-muted uppercase ml-2">Nombre del Producto</label>
-                    <input type="text" id="newName" class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-lg focus:border-accent outline-none" placeholder="Ej: Jabón Dove 400g" required>
+    <!-- ══════════ MODAL: NUEVO PRODUCTO ══════════ -->
+    <div id="modalNew" class="modal">
+        <div class="glass w-full max-w-md p-8 rounded-[32px] m-4">
+            <p class="text-xs font-bold text-accent uppercase tracking-widest mb-1">Producto no encontrado</p>
+            <h3 class="text-2xl font-bold mb-1">Registrar Producto</h3>
+            <p class="text-muted text-sm mb-6">Código: <span id="codeLabel" class="text-accent font-mono font-bold"></span></p>
+
+            <form onsubmit="saveProduct(event)" class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-muted uppercase block mb-1">Nombre</label>
+                    <input type="text" id="newName" required
+                           class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-lg focus:border-accent outline-none"
+                           placeholder="Ej: Leche Lala 1L">
                 </div>
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-muted uppercase ml-2">Precio de Venta ($)</label>
-                    <input type="number" id="newPrice" step="0.01" class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-3xl font-bold text-accent focus:border-accent outline-none" placeholder="0.00" required>
+                <div>
+                    <label class="text-xs font-bold text-muted uppercase block mb-1">Precio ($)</label>
+                    <input type="number" id="newPrice" step="0.01" min="0.01" required
+                           class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-2xl font-bold text-accent focus:border-accent outline-none"
+                           placeholder="0.00">
                 </div>
-                <div class="flex gap-4 pt-4">
-                    <button type="button" onclick="closeModal()" class="flex-1 py-4 text-muted font-bold">CANCELAR</button>
-                    <button type="submit" class="flex-1 bg-accent text-bg py-4 rounded-2xl font-black text-lg">GUARDAR Y AGREGAR</button>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeModal()" class="btn flex-1 py-4 text-muted font-bold bg-white/5 rounded-2xl">Cancelar</button>
+                    <button type="submit" class="btn flex-1 py-4 bg-accent text-bg font-black rounded-2xl">Guardar y Agregar</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script>
-        // CONFIG SUPABASE (Opcional)
-        const URL = 'TU_URL_SUPABASE'; 
-        const KEY = 'TU_KEY_SUPABASE';
-        let supabase = (URL.startsWith('http')) ? window.supabase.createClient(URL, KEY) : null;
-
-        if (supabase) {
-            document.getElementById('dbStatus').textContent = 'Base de Datos: ONLINE';
-            document.getElementById('dbStatus').classList.add('text-accent');
-        } else {
-            document.getElementById('dbStatus').textContent = 'Modo Local (Offline)';
-            document.getElementById('dbStatus').classList.add('text-orange-400');
+        // ══════════ SUPABASE CONFIG ══════════
+        const SB_URL = 'TU_URL_SUPABASE';
+        const SB_KEY = 'TU_KEY_SUPABASE';
+        let supabase = null;
+        if (SB_URL.startsWith('http')) {
+            supabase = window.supabase.createClient(SB_URL, SB_KEY);
+            document.getElementById('dbStatus').textContent = 'Base de datos: Online';
+            document.getElementById('dbStatus').classList.replace('text-orange-400', 'text-accent');
         }
 
+        // ══════════ ESTADO ══════════
         let cart = [];
-        let html5QrCode = null;
+        let cameraStream = null;
+        let scanLoop = null;
         let isProcessing = false;
+        let barcodeDetector = null;
 
-        // INICIALIZAR ESCÁNER CON MEJORAS DE COMPATIBILIDAD
-        async function initScanner() {
-            const resultLabel = document.getElementById('scanResultLabel');
-            resultLabel.textContent = "Iniciando cámara...";
-            resultLabel.classList.add('animate-pulse');
+        // ══════════ INIT: DETECTOR DE CÓDIGOS ══════════
+        async function initBarcodeDetector() {
+            if ('BarcodeDetector' in window) {
+                barcodeDetector = new BarcodeDetector({
+                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
+                });
+                console.log('✅ BarcodeDetector nativo disponible');
+            } else {
+                console.warn('⚠️ BarcodeDetector no disponible, se usará detección con html5-qrcode');
+                barcodeDetector = null;
+            }
+        }
+
+        // ══════════ CÁMARA: ABRIR ══════════
+        async function startCamera() {
+            const statusLabel = document.getElementById('statusLabel');
+            const placeholder = document.getElementById('scanPlaceholder');
+            const overlay = document.getElementById('scanOverlay');
+            const video = document.getElementById('scannerVideo');
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+
+            statusLabel.textContent = 'Conectando...';
 
             try {
-                // Cerrar instancia previa si existe
-                if (html5QrCode) {
-                    try { await html5QrCode.stop(); } catch(e) {}
+                // Pedir permiso de cámara trasera; si falla, pedir cualquier cámara
+                const constraints = [
+                    { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+                    { video: { facingMode: 'environment' } },
+                    { video: true }
+                ];
+
+                let stream = null;
+                for (const c of constraints) {
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(c);
+                        break;
+                    } catch(e) {
+                        console.warn('Intento fallido con constraints:', c, e);
+                    }
                 }
 
-                html5QrCode = new Html5Qrcode("reader");
-                const config = { 
-                    fps: 15, 
-                    qrbox: { width: 250, height: 180 }
-                };
+                if (!stream) throw new Error('No se pudo acceder a ninguna cámara');
 
-                document.getElementById('startBtn').classList.add('hidden');
-                document.getElementById('stopBtn').classList.remove('hidden');
-                
-                // Intento principal: Cámara trasera
-                await html5QrCode.start(
-                    { facingMode: "environment" }, 
-                    config, 
-                    onScanSuccess
-                ).catch(err => {
-                    console.warn("Fallo cámara trasera, intentando cualquier cámara...", err);
-                    // Intento de respaldo: Cualquier cámara
-                    return html5QrCode.start({ facingMode: "user" }, config, onScanSuccess);
-                });
+                cameraStream = stream;
+                video.srcObject = stream;
+                await video.play();
 
-                resultLabel.textContent = "Escáner Activo";
-                resultLabel.classList.remove('animate-pulse');
-                resultLabel.classList.replace('text-muted', 'text-accent');
+                // Actualizar UI
+                placeholder.classList.add('hidden');
+                overlay.classList.remove('hidden');
+                btnStart.classList.add('hidden');
+                btnStop.classList.remove('hidden');
+                statusLabel.textContent = 'Activo ✓';
+                statusLabel.classList.replace('text-muted', 'text-accent');
+
+                // Iniciar detector
+                await initBarcodeDetector();
+                startScanLoop();
 
             } catch (err) {
-                console.error("Error al iniciar cámara:", err);
-                resultLabel.textContent = "Error: " + (err.name || "Falla de cámara");
-                resultLabel.classList.replace('text-muted', 'text-danger');
-                
-                if (err.name === 'NotAllowedError') {
-                    alert("⚠️ PERMISO DENEGADO: Por favor activa la cámara en el icono del candado 🔒 de tu navegador.");
+                console.error('Error de cámara:', err);
+                statusLabel.textContent = 'Error: ' + (err.name || 'falla');
+
+                let msg = '⚠️ No se pudo abrir la cámara.\n\n';
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    msg += 'SOLUCIÓN: Toca el ícono del candado 🔒 en la barra de tu navegador y activa el permiso de "Cámara".';
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    msg += 'SOLUCIÓN: No se encontró ninguna cámara en tu dispositivo.';
+                } else if (err.name === 'NotReadableError') {
+                    msg += 'SOLUCIÓN: Otra aplicación está usando la cámara. Ciérrala e intenta de nuevo.';
                 } else {
-                    alert("Error: " + (err.message || "No se pudo iniciar la cámara"));
+                    msg += 'Error técnico: ' + err.message;
                 }
-                stopScanner();
+                alert(msg);
             }
         }
 
-        async function stopScanner() {
-            if (html5QrCode) {
-                try {
-                    await html5QrCode.stop();
-                    await html5QrCode.clear();
-                } catch(e) {}
-            }
-            document.getElementById('startBtn').classList.remove('hidden');
-            document.getElementById('stopBtn').classList.add('hidden');
-            document.getElementById('scanResultLabel').textContent = "Escáner detenido";
+        // ══════════ CÁMARA: DETENER ══════════
+        function stopCamera() {
+            if (scanLoop) { clearInterval(scanLoop); scanLoop = null; }
+            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+
+            const video = document.getElementById('scannerVideo');
+            video.srcObject = null;
+
+            document.getElementById('scanPlaceholder').classList.remove('hidden');
+            document.getElementById('scanOverlay').classList.add('hidden');
+            document.getElementById('btnStart').classList.remove('hidden');
+            document.getElementById('btnStop').classList.add('hidden');
+            document.getElementById('statusLabel').textContent = 'Inactivo';
+            document.getElementById('statusLabel').classList.replace('text-accent', 'text-muted');
         }
 
-        async function onScanSuccess(decodedText) {
+        // ══════════ BUCLE DE DETECCIÓN ══════════
+        function startScanLoop() {
+            const video = document.getElementById('scannerVideo');
+            const canvas = document.getElementById('scannerCanvas');
+            const ctx = canvas.getContext('2d');
+
+            scanLoop = setInterval(async () => {
+                if (isProcessing || video.readyState < 2) return;
+
+                if (barcodeDetector) {
+                    // Usar API nativa (Chrome Android, Chrome Desktop)
+                    try {
+                        const codes = await barcodeDetector.detect(video);
+                        if (codes.length > 0) {
+                            onCodeDetected(codes[0].rawValue);
+                        }
+                    } catch(e) { /* silencioso */ }
+                } else {
+                    // Fallback: usar html5-qrcode como librería de decodificación
+                    try {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0);
+                        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                        Html5Qrcode.scanFile(imageData, false)
+                            .then(code => onCodeDetected(code))
+                            .catch(() => {});
+                    } catch(e) { /* silencioso */ }
+                }
+            }, 300); // Revisar cada 300ms
+        }
+
+        // ══════════ PROCESAMIENTO DE CÓDIGO ══════════
+        async function onCodeDetected(code) {
             if (isProcessing) return;
             isProcessing = true;
-            
-            // Efecto Visual y Háptico
-            document.getElementById('flashOverlay').classList.add('flash-active');
-            if (navigator.vibrate) navigator.vibrate(100);
-            document.getElementById('scanResultLabel').textContent = "Detectado: " + decodedText;
 
-            await handleProductAction(decodedText);
-            
+            // Feedback visual y háptico
+            const flash = document.getElementById('flashEl');
+            flash.classList.add('flash-overlay');
+            if (navigator.vibrate) navigator.vibrate(150);
+            setTimeout(() => flash.classList.remove('flash-overlay'), 500);
+
+            document.getElementById('statusLabel').textContent = 'Detectado: ' + code;
+
+            await processCode(code);
+
             setTimeout(() => {
-                document.getElementById('flashOverlay').classList.remove('flash-active');
                 isProcessing = false;
-            }, 2000); // Pausa de 2 segundos entre lecturas
+                document.getElementById('statusLabel').textContent = 'Activo ✓';
+            }, 2500);
         }
 
-        async function handleProductAction(code) {
+        async function processCode(code) {
             let product = null;
 
             if (supabase) {
                 const { data } = await supabase.from('productos').select('*').eq('codigo_barras', code).single();
                 product = data;
             } else {
-                const db = JSON.parse(localStorage.getItem('pos_local_db') || '[]');
-                product = db.find(p => p.codigo_barras === code);
+                const db = JSON.parse(localStorage.getItem('pos_local') || '[]');
+                product = db.find(p => p.codigo_barras === code) || null;
             }
 
             if (product) {
-                addItemToCart(product);
+                addToCart(product);
             } else {
                 openModal(code);
             }
         }
 
-        function addItemToCart(p) {
-            const existing = cart.find(item => item.id === p.id);
-            if (existing) {
-                existing.qty++;
-            } else {
-                cart.push({ ...p, qty: (p.qty || 1) });
-            }
+        // ══════════ CARRITO ══════════
+        function addToCart(p) {
+            const ex = cart.find(i => i.id === p.id);
+            if (ex) { ex.qty++; } else { cart.push({ ...p, qty: 1 }); }
             renderCart();
         }
 
         function renderCart() {
             const list = document.getElementById('cartList');
-            const totalEl = document.getElementById('totalDisplay');
-            const countEl = document.getElementById('cartCount');
+            const totalEl = document.getElementById('totalVal');
+            const subEl = document.getElementById('subtotalVal');
+            const countEl = document.getElementById('cartCountLabel');
 
             if (cart.length === 0) {
-                list.innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-center opacity-30"><p class="italic">Esperando escaneo...</p></div>`;
-                totalEl.textContent = "$0.00";
-                countEl.textContent = "0 PRODUCTOS";
+                list.innerHTML = `<div id="emptyState" class="flex flex-col items-center justify-center h-56 opacity-30 text-center">
+                    <svg class="w-20 h-20 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <p class="italic text-sm">El carrito está vacío</p></div>`;
+                totalEl.textContent = '$0.00'; subEl.textContent = '$0.00'; countEl.textContent = '0 items';
                 return;
             }
 
             let total = 0;
-            list.innerHTML = cart.map((item, idx) => {
+            list.innerHTML = cart.map((item, i) => {
                 const sub = item.precio * item.qty;
                 total += sub;
-                return `
-                    <div class="flex items-center gap-4 bg-white/5 p-5 rounded-2xl border border-white/5 animate-pulse-once">
-                        <div class="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center font-bold text-accent">${item.qty}x</div>
-                        <div class="flex-1">
-                            <h4 class="font-bold text-lg">${item.nombre}</h4>
-                            <p class="text-xs font-mono text-muted tracking-widest">${item.codigo_barras}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xl font-bold font-mono text-accent">$${sub.toFixed(2)}</p>
-                            <button onclick="removeIdx(${idx})" class="text-[10px] font-black text-danger/50 hover:text-danger uppercase tracking-tighter">Quitar</button>
-                        </div>
+                return `<div class="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <div class="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center font-black text-accent text-lg">${item.qty}x</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold truncate">${item.nombre}</p>
+                        <p class="text-xs font-mono text-muted">${item.codigo_barras}</p>
                     </div>
-                `;
+                    <div class="text-right shrink-0">
+                        <p class="font-black font-mono text-accent text-lg">$${sub.toFixed(2)}</p>
+                        <button onclick="removeItem(${i})" class="text-[10px] text-danger/60 hover:text-danger font-bold uppercase">Quitar</button>
+                    </div>
+                </div>`;
             }).join('');
 
+            const qty = cart.reduce((a, b) => a + b.qty, 0);
+            countEl.textContent = `${qty} item${qty !== 1 ? 's' : ''}`;
+            subEl.textContent = `$${total.toFixed(2)}`;
             totalEl.textContent = `$${total.toFixed(2)}`;
-            const totalQty = cart.reduce((a, b) => a + (b.qty || 1), 0);
-            countEl.textContent = `${totalQty} PRODUCTO${totalQty !== 1 ? 'S' : ''}`;
         }
 
-        function removeIdx(idx) {
-            cart.splice(idx, 1);
-            renderCart();
-        }
+        function removeItem(i) { cart.splice(i, 1); renderCart(); }
 
+        // ══════════ MODAL ══════════
         function openModal(code) {
-            document.getElementById('newCodeLabel').textContent = code;
-            document.getElementById('modalNew').classList.replace('hidden', 'flex');
+            document.getElementById('codeLabel').textContent = code;
+            document.getElementById('modalNew').classList.add('open');
+            setTimeout(() => document.getElementById('newName').focus(), 200);
         }
-
-        function closeModal() {
-            document.getElementById('modalNew').classList.replace('flex', 'hidden');
-        }
+        function closeModal() { document.getElementById('modalNew').classList.remove('open'); }
 
         async function saveProduct(e) {
             e.preventDefault();
-            const code = document.getElementById('newCodeLabel').textContent;
-            const name = document.getElementById('newName').value;
-            const price = parseFloat(document.getElementById('newPrice').value);
-            
-            const prod = { id: Date.now(), nombre: name, precio: price, codigo_barras: code, qty: 1 };
+            const code = document.getElementById('codeLabel').textContent;
+            const nombre = document.getElementById('newName').value.trim();
+            const precio = parseFloat(document.getElementById('newPrice').value);
+
+            const prod = { id: `local_${Date.now()}`, nombre, precio, codigo_barras: code };
 
             if (supabase) {
-                await supabase.from('productos').insert([prod]);
+                const { data } = await supabase.from('productos').insert([prod]).select().single();
+                if (data) prod.id = data.id;
             } else {
-                const db = JSON.parse(localStorage.getItem('pos_local_db') || '[]');
+                const db = JSON.parse(localStorage.getItem('pos_local') || '[]');
                 db.push(prod);
-                localStorage.setItem('pos_local_db', JSON.stringify(db));
+                localStorage.setItem('pos_local', JSON.stringify(db));
             }
 
-            addItemToCart(prod);
+            addToCart(prod);
             closeModal();
             e.target.reset();
         }
 
+        // ══════════ BÚSQUEDA MANUAL ══════════
         function manualSearch() {
-            const input = document.getElementById('manualInput');
-            if (input.value) {
-                handleProductAction(input.value);
-                input.value = '';
-            }
+            const inp = document.getElementById('manualCode');
+            const code = inp.value.trim();
+            if (code) { processCode(code); inp.value = ''; }
         }
 
-        function finalizeSale() {
-            if (cart.length === 0) return;
-            alert("¡Venta Finalizada!");
-            cart = [];
-            renderCart();
+        // ══════════ FINALIZAR VENTA ══════════
+        async function finalizeSale() {
+            if (cart.length === 0) { alert('El carrito está vacío'); return; }
+            const total = cart.reduce((a, b) => a + b.precio * b.qty, 0);
+            if (confirm(`¿Confirmar venta por $${total.toFixed(2)}?`)) {
+                if (supabase) {
+                    const { data: venta } = await supabase.from('ventas').insert([{ total, fecha: new Date().toISOString() }]).select().single();
+                    if (venta) {
+                        const detalles = cart.map(item => ({ venta_id: venta.id, producto_id: item.id, cantidad: item.qty, precio_unitario: item.precio }));
+                        await supabase.from('detalle_venta').insert(detalles);
+                    }
+                }
+                alert(`✅ Venta completada: $${total.toFixed(2)}`);
+                cart = [];
+                renderCart();
+            }
         }
     </script>
 </body>
