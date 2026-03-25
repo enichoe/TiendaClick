@@ -7,8 +7,6 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- html5-qrcode con versión fija y estable -->
-    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
 
@@ -31,76 +29,76 @@
     </script>
 
     <style>
-        :root { --accent: #00d4aa; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0a0f0d; color: #e8ede9; overflow-x: hidden; }
-        .glass { background: rgba(20, 26, 23, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); }
-        .glow { box-shadow: 0 0 30px rgba(0,212,170,0.25); }
+        .glass { background: rgba(20, 26, 23, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.07); }
+        .glow { box-shadow: 0 0 28px rgba(0,212,170,0.3); }
+        .btn { transition: all 0.18s ease; cursor: pointer; }
+        .btn:active { transform: scale(0.96); }
 
-        /* VIDEO DEL SCANNER */
         #scannerVideo {
             width: 100%;
             height: 280px;
             object-fit: cover;
-            border-radius: 14px;
             display: block;
+            border-radius: 14px;
             background: #000;
         }
-        #scannerCanvas { display: none; }
 
-        /* Animación de línea de escaneo */
+        /* Línea animada de escaneo */
         .scan-line {
             position: absolute;
-            left: 10%; right: 10%;
+            left: 8%; right: 8%;
             height: 3px;
             background: linear-gradient(90deg, transparent, #00d4aa, transparent);
             border-radius: 2px;
-            animation: scanAnim 2s ease-in-out infinite;
-            box-shadow: 0 0 8px #00d4aa;
+            box-shadow: 0 0 10px #00d4aa;
+            animation: lineAnim 2s ease-in-out infinite;
         }
-        @keyframes scanAnim {
-            0%   { top: 15%; opacity: 0; }
+        @keyframes lineAnim {
+            0%   { top: 12%; opacity: 0; }
             10%  { opacity: 1; }
             50%  { top: 80%; }
             90%  { opacity: 1; }
-            100% { top: 15%; opacity: 0; }
+            100% { top: 12%; opacity: 0; }
         }
 
-        /* Esquinas del scanner */
-        .corner { position: absolute; width: 22px; height: 22px; border-color: #00d4aa; border-style: solid; }
-        .tl { top: 10%; left: 10%; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
-        .tr { top: 10%; right: 10%; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
-        .bl { bottom: 10%; left: 10%; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
-        .br { bottom: 10%; right: 10%; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
-
-        .btn { transition: all 0.18s ease; cursor: pointer; }
-        .btn:active { transform: scale(0.96); }
+        /* Esquinas del frame de escaneo */
+        .corner { position: absolute; width: 20px; height: 20px; border-color: #00d4aa; border-style: solid; }
+        .tl { top: 8%; left: 8%; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+        .tr { top: 8%; right: 8%; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+        .bl { bottom: 8%; left: 8%; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+        .br { bottom: 8%; right: 8%; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
 
         /* Scrollbar */
         .sc::-webkit-scrollbar { width: 5px; }
         .sc::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 5px; }
 
         /* Modal */
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(6px); }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
         .modal.open { display: flex; }
 
-        /* Flash success */
-        @keyframes flash { 0%,100% { opacity:0 } 40%,60% { opacity:1 } }
-        .flash-overlay { animation: flash 0.5s ease-out; }
+        @keyframes flash-anim { 0%,100% { opacity:0 } 40%,60% { opacity:1 } }
+        #flashEl { animation: none; }
+        #flashEl.flashing { animation: flash-anim 0.5s ease-out; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
 
-    <!-- Flash de éxito al escanear -->
-    <div id="flashEl" class="fixed inset-0 pointer-events-none z-50 bg-accent/20 opacity-0"></div>
+    <!-- Overlay flash al escanear -->
+    <div id="flashEl" class="fixed inset-0 pointer-events-none z-50 bg-accent/25 opacity-0"></div>
 
     <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8">
 
-        <!-- ══════════ PANEL IZQUIERDO: SCANNER ══════════ -->
-        <div class="w-full lg:w-[45%] flex flex-col gap-6">
-            <!-- Encabezado -->
+        <!-- ═══ PANEL IZQUIERDO: SCANNER ═══ -->
+        <div class="w-full lg:w-[44%] flex flex-col gap-6">
+
+            <!-- Header -->
             <div class="flex items-center gap-4">
                 <div class="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center glow shrink-0">
-                    <svg class="w-8 h-8 text-bg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 12h10"/></svg>
+                    <svg class="w-7 h-7 text-bg" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="5" height="5" rx="1"/><rect x="16" y="3" width="5" height="5" rx="1"/>
+                        <rect x="3" y="16" width="5" height="5" rx="1"/><path d="M16 11h5m-5 5h2m3 0h0M11 3v5m0 5v8M3 11h5"/>
+                    </svg>
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold">TiendaClick <span class="text-accent">POS</span></h1>
@@ -108,19 +106,18 @@
                 </div>
             </div>
 
-            <!-- Tarjeta del Scanner -->
+            <!-- Card Scanner -->
             <div class="glass rounded-3xl p-5">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-bold text-lg">Escáner de Productos</h2>
-                    <span id="statusLabel" class="text-xs font-mono text-muted px-3 py-1 bg-white/5 rounded-full">Inactivo</span>
+                    <h2 class="font-bold text-lg">Escáner de Cámara</h2>
+                    <span id="statusLabel" class="text-xs font-mono px-3 py-1 rounded-full bg-white/5 text-muted">Inactivo</span>
                 </div>
 
-                <!-- Viewport de la cámara -->
-                <div class="relative rounded-2xl overflow-hidden bg-black" style="height: 280px;">
-                    <video id="scannerVideo" autoplay playsinline muted></video>
-                    <canvas id="scannerCanvas"></canvas>
+                <!-- Área de video -->
+                <div class="relative rounded-2xl overflow-hidden bg-black" style="height:280px">
+                    <video id="camVideo" autoplay playsinline muted></video>
 
-                    <!-- Overlay de escaneo (visible solo cuando la cámara está activa) -->
+                    <!-- Overlay de escaneo (oculto hasta activar cámara) -->
                     <div id="scanOverlay" class="absolute inset-0 hidden">
                         <div class="scan-line"></div>
                         <div class="corner tl"></div>
@@ -130,62 +127,66 @@
                     </div>
 
                     <!-- Placeholder cuando no hay cámara -->
-                    <div id="scanPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-muted/60">
-                        <svg class="w-16 h-16 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        <p class="text-sm font-medium">Presiona "INICIAR" para activar la cámara</p>
+                    <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/25">
+                        <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                            <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <p class="text-sm">Toca "INICIAR CÁMARA"</p>
                     </div>
                 </div>
 
-                <!-- Botones de control -->
-                <div class="mt-5 grid grid-cols-2 gap-3">
-                    <button id="btnStart" onclick="startCamera()" class="btn col-span-2 bg-accent text-bg font-black py-5 rounded-2xl text-lg glow flex items-center justify-center gap-3">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <!-- Botones -->
+                <div class="mt-5 space-y-3">
+                    <button id="btnStart" onclick="startCamera()" class="btn w-full py-5 bg-accent text-bg font-black text-lg rounded-2xl glow flex items-center justify-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
                         INICIAR CÁMARA
                     </button>
-                    <button id="btnStop" onclick="stopCamera()" class="btn hidden col-span-2 bg-danger/20 text-danger font-bold py-4 rounded-2xl border border-danger/30">
+                    <button id="btnStop" onclick="stopCamera()" style="display:none" class="btn w-full py-4 bg-red-500/20 text-red-400 font-bold rounded-2xl border border-red-500/30">
                         DETENER CÁMARA
                     </button>
                 </div>
 
                 <!-- Ingreso manual -->
                 <div class="mt-5 pt-5 border-t border-white/5">
-                    <p class="text-xs text-muted font-bold uppercase mb-3 tracking-wider">Ingreso Manual de Código</p>
+                    <p class="text-xs text-muted font-bold uppercase mb-3 tracking-wider">Código Manual</p>
                     <div class="flex gap-2">
-                        <input id="manualCode" type="text" onkeydown="if(event.key==='Enter')manualSearch()"
+                        <input id="manualCode" type="text" onkeydown="if(event.key==='Enter') manualSearch()"
                                class="flex-1 bg-surface border border-border rounded-xl px-4 py-3 font-mono text-sm focus:border-accent outline-none"
-                               placeholder="Escribe el código...">
+                               placeholder="Ingresa el código...">
                         <button onclick="manualSearch()" class="btn px-5 bg-surface border border-border rounded-xl font-bold text-xs uppercase hover:border-accent">OK</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ══════════ PANEL DERECHO: CARRITO ══════════ -->
+        <!-- ═══ PANEL DERECHO: CARRITO ═══ -->
         <div class="flex-1">
-            <div class="glass rounded-3xl p-6 flex flex-col" style="min-height: 600px;">
-                <!-- Header del carrito -->
+            <div class="glass rounded-3xl p-6 flex flex-col" style="min-height:600px">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold">Carrito de Venta</h2>
-                    <span id="cartCountLabel" class="bg-accent/15 text-accent px-4 py-2 rounded-xl font-bold text-sm border border-accent/20">0 items</span>
+                    <span id="cartCountEl" class="bg-accent/15 text-accent px-4 py-2 rounded-xl font-bold text-sm border border-accent/20">0 items</span>
                 </div>
 
-                <!-- Lista de productos -->
-                <div id="cartList" class="flex-1 overflow-y-auto sc space-y-3 mb-6" style="max-height: 440px;">
-                    <div id="emptyState" class="flex flex-col items-center justify-center h-56 opacity-30 text-center">
-                        <svg class="w-20 h-20 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <div id="cartList" class="flex-1 overflow-y-auto sc space-y-3 mb-6" style="max-height:440px">
+                    <div id="emptyMsg" class="flex flex-col items-center justify-center h-56 opacity-25 text-center">
+                        <svg class="w-20 h-20 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                            <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
                         <p class="italic text-sm">El carrito está vacío</p>
                     </div>
                 </div>
 
-                <!-- Totales y botón de pago -->
                 <div class="border-t border-white/6 pt-6">
                     <div class="flex justify-between text-muted mb-2 text-sm">
-                        <span>Subtotal</span>
-                        <span id="subtotalVal" class="font-mono">$0.00</span>
+                        <span>Subtotal</span><span id="subtotalEl" class="font-mono">$0.00</span>
                     </div>
                     <div class="flex justify-between items-baseline mb-6">
                         <span class="text-muted font-bold uppercase tracking-widest text-xs">Total</span>
-                        <span id="totalVal" class="text-4xl font-black text-accent font-mono">$0.00</span>
+                        <span id="totalEl" class="text-4xl font-black text-accent font-mono">$0.00</span>
                     </div>
                     <button onclick="finalizeSale()" class="btn w-full py-5 bg-accent text-bg font-black text-xl rounded-2xl glow">COBRAR</button>
                 </div>
@@ -193,25 +194,20 @@
         </div>
     </div>
 
-    <!-- ══════════ MODAL: NUEVO PRODUCTO ══════════ -->
+    <!-- ═══ MODAL: NUEVO PRODUCTO ═══ -->
     <div id="modalNew" class="modal">
-        <div class="glass w-full max-w-md p-8 rounded-[32px] m-4">
-            <p class="text-xs font-bold text-accent uppercase tracking-widest mb-1">Producto no encontrado</p>
-            <h3 class="text-2xl font-bold mb-1">Registrar Producto</h3>
-            <p class="text-muted text-sm mb-6">Código: <span id="codeLabel" class="text-accent font-mono font-bold"></span></p>
-
+        <div class="glass w-full max-w-md p-8 rounded-3xl m-4">
+            <p class="text-xs font-bold text-accent uppercase tracking-widest mb-1">Código no registrado</p>
+            <h3 class="text-2xl font-bold mb-6">Registrar Producto</h3>
+            <p class="text-muted text-sm mb-6">Código: <span id="codeLabel" class="text-accent font-mono font-bold text-base"></span></p>
             <form onsubmit="saveProduct(event)" class="space-y-4">
                 <div>
-                    <label class="text-xs font-bold text-muted uppercase block mb-1">Nombre</label>
-                    <input type="text" id="newName" required
-                           class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-lg focus:border-accent outline-none"
-                           placeholder="Ej: Leche Lala 1L">
+                    <label class="text-xs font-bold text-muted uppercase block mb-1">Nombre del producto</label>
+                    <input type="text" id="newName" required class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-lg focus:border-accent outline-none" placeholder="Ej: Coca-Cola 600ml">
                 </div>
                 <div>
                     <label class="text-xs font-bold text-muted uppercase block mb-1">Precio ($)</label>
-                    <input type="number" id="newPrice" step="0.01" min="0.01" required
-                           class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-2xl font-bold text-accent focus:border-accent outline-none"
-                           placeholder="0.00">
+                    <input type="number" id="newPrice" step="0.01" min="0.01" required class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-2xl font-bold text-accent focus:border-accent outline-none" placeholder="0.00">
                 </div>
                 <div class="flex gap-3 pt-2">
                     <button type="button" onclick="closeModal()" class="btn flex-1 py-4 text-muted font-bold bg-white/5 rounded-2xl">Cancelar</button>
@@ -222,162 +218,171 @@
     </div>
 
     <script>
-        // ══════════ SUPABASE CONFIG ══════════
+        // ═══════════════════════════════════════
+        // SUPABASE CONFIG — Reemplaza con tus datos
+        // ═══════════════════════════════════════
         const SB_URL = 'TU_URL_SUPABASE';
         const SB_KEY = 'TU_KEY_SUPABASE';
         let supabase = null;
         if (SB_URL.startsWith('http')) {
             supabase = window.supabase.createClient(SB_URL, SB_KEY);
-            document.getElementById('dbStatus').textContent = 'Base de datos: Online';
-            document.getElementById('dbStatus').classList.replace('text-orange-400', 'text-accent');
+            document.getElementById('dbStatus').textContent = 'Base de Datos: Online';
+            document.getElementById('dbStatus').style.color = '#00d4aa';
         }
 
-        // ══════════ ESTADO ══════════
+        // ═══════════════════════════════════════
+        // ESTADO
+        // ═══════════════════════════════════════
         let cart = [];
         let cameraStream = null;
-        let scanLoop = null;
+        let scanIntervalId = null;
         let isProcessing = false;
-        let barcodeDetector = null;
 
-        // ══════════ INIT: DETECTOR DE CÓDIGOS ══════════
-        async function initBarcodeDetector() {
-            if ('BarcodeDetector' in window) {
-                barcodeDetector = new BarcodeDetector({
-                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
-                });
-                console.log('✅ BarcodeDetector nativo disponible');
-            } else {
-                console.warn('⚠️ BarcodeDetector no disponible, se usará detección con html5-qrcode');
-                barcodeDetector = null;
-            }
-        }
-
-        // ══════════ CÁMARA: ABRIR ══════════
+        // ═══════════════════════════════════════
+        // FUNCIONES DE CÁMARA
+        // ═══════════════════════════════════════
         async function startCamera() {
-            const statusLabel = document.getElementById('statusLabel');
-            const placeholder = document.getElementById('scanPlaceholder');
-            const overlay = document.getElementById('scanOverlay');
-            const video = document.getElementById('scannerVideo');
-            const btnStart = document.getElementById('btnStart');
-            const btnStop = document.getElementById('btnStop');
-
-            statusLabel.textContent = 'Conectando...';
+            const statusEl = document.getElementById('statusLabel');
+            statusEl.textContent = 'Conectando...';
+            statusEl.style.color = '#ffa502';
 
             try {
-                // Pedir permiso de cámara trasera; si falla, pedir cualquier cámara
-                const constraints = [
-                    { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
-                    { video: { facingMode: 'environment' } },
-                    { video: true }
-                ];
-
-                let stream = null;
-                for (const c of constraints) {
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia(c);
-                        break;
-                    } catch(e) {
-                        console.warn('Intento fallido con constraints:', c, e);
-                    }
+                // Pedir acceso a la cámara trasera (o cualquier cámara si no hay trasera)
+                let stream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } },
+                        audio: false
+                    });
+                } catch (e) {
+                    // Fallback: cualquier cámara disponible
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                 }
-
-                if (!stream) throw new Error('No se pudo acceder a ninguna cámara');
 
                 cameraStream = stream;
+                const video = document.getElementById('camVideo');
                 video.srcObject = stream;
-                await video.play();
 
                 // Actualizar UI
-                placeholder.classList.add('hidden');
-                overlay.classList.remove('hidden');
-                btnStart.classList.add('hidden');
-                btnStop.classList.remove('hidden');
-                statusLabel.textContent = 'Activo ✓';
-                statusLabel.classList.replace('text-muted', 'text-accent');
+                document.getElementById('camPlaceholder').style.display = 'none';
+                document.getElementById('scanOverlay').classList.remove('hidden');
+                document.getElementById('btnStart').style.display = 'none';
+                document.getElementById('btnStop').style.display = 'block';
+                statusEl.textContent = 'Activo ✓';
+                statusEl.style.color = '#00d4aa';
 
-                // Iniciar detector
-                await initBarcodeDetector();
-                startScanLoop();
+                // Iniciar bucle de detección
+                startDetectionLoop();
 
             } catch (err) {
-                console.error('Error de cámara:', err);
-                statusLabel.textContent = 'Error: ' + (err.name || 'falla');
+                statusEl.textContent = 'Error';
+                statusEl.style.color = '#ff4757';
 
-                let msg = '⚠️ No se pudo abrir la cámara.\n\n';
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    msg += 'SOLUCIÓN: Toca el ícono del candado 🔒 en la barra de tu navegador y activa el permiso de "Cámara".';
-                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                    msg += 'SOLUCIÓN: No se encontró ninguna cámara en tu dispositivo.';
+                if (err.name === 'NotAllowedError') {
+                    alert('⛔ Permiso denegado.\n\nPara activar la cámara:\n1. Haz clic en el ícono del candado 🔒 en la barra del navegador.\n2. Permite el acceso a "Cámara".\n3. Recarga la página.');
+                } else if (err.name === 'NotFoundError') {
+                    alert('⛔ No se encontró cámara.\n\nAsegúrate de tener una cámara disponible en este dispositivo.');
                 } else if (err.name === 'NotReadableError') {
-                    msg += 'SOLUCIÓN: Otra aplicación está usando la cámara. Ciérrala e intenta de nuevo.';
+                    alert('⛔ La cámara está siendo usada por otra aplicación.\nCiérrala e intenta de nuevo.');
                 } else {
-                    msg += 'Error técnico: ' + err.message;
+                    alert('⛔ Error: ' + err.name + '\n' + err.message);
                 }
-                alert(msg);
             }
         }
 
-        // ══════════ CÁMARA: DETENER ══════════
         function stopCamera() {
-            if (scanLoop) { clearInterval(scanLoop); scanLoop = null; }
+            if (scanIntervalId) { clearInterval(scanIntervalId); scanIntervalId = null; }
             if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
 
-            const video = document.getElementById('scannerVideo');
+            const video = document.getElementById('camVideo');
             video.srcObject = null;
 
-            document.getElementById('scanPlaceholder').classList.remove('hidden');
+            document.getElementById('camPlaceholder').style.display = 'flex';
             document.getElementById('scanOverlay').classList.add('hidden');
-            document.getElementById('btnStart').classList.remove('hidden');
-            document.getElementById('btnStop').classList.add('hidden');
-            document.getElementById('statusLabel').textContent = 'Inactivo';
-            document.getElementById('statusLabel').classList.replace('text-accent', 'text-muted');
+            document.getElementById('btnStart').style.display = 'block';
+            document.getElementById('btnStop').style.display = 'none';
+
+            const statusEl = document.getElementById('statusLabel');
+            statusEl.textContent = 'Inactivo';
+            statusEl.style.color = '#6b7c74';
         }
 
-        // ══════════ BUCLE DE DETECCIÓN ══════════
-        function startScanLoop() {
-            const video = document.getElementById('scannerVideo');
-            const canvas = document.getElementById('scannerCanvas');
-            const ctx = canvas.getContext('2d');
+        // ═══════════════════════════════════════
+        // DETECCIÓN DE CÓDIGOS DE BARRAS
+        // ═══════════════════════════════════════
+        function startDetectionLoop() {
+            const video = document.getElementById('camVideo');
 
-            scanLoop = setInterval(async () => {
-                if (isProcessing || video.readyState < 2) return;
-
-                if (barcodeDetector) {
-                    // Usar API nativa (Chrome Android, Chrome Desktop)
+            // Usar BarcodeDetector nativo si está disponible (Chrome Android, Chrome desktop)
+            if ('BarcodeDetector' in window) {
+                const detector = new BarcodeDetector({
+                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e', 'itf']
+                });
+                scanIntervalId = setInterval(async () => {
+                    if (isProcessing || !video.srcObject || video.readyState < 2) return;
                     try {
-                        const codes = await barcodeDetector.detect(video);
-                        if (codes.length > 0) {
-                            onCodeDetected(codes[0].rawValue);
+                        const results = await detector.detect(video);
+                        if (results.length > 0) {
+                            onCodeFound(results[0].rawValue);
                         }
-                    } catch(e) { /* silencioso */ }
-                } else {
-                    // Fallback: usar html5-qrcode como librería de decodificación
+                    } catch (e) { /* silencioso */ }
+                }, 300);
+            } else {
+                // Navegadores sin BarcodeDetector nativo: usar canvas + ZXing (fallback multi-format)
+                loadZXingAndScan(video);
+            }
+        }
+
+        // Fallback con ZXing para Firefox / Safari
+        function loadZXingAndScan(video) {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+            script.onload = () => {
+                const hints = new Map();
+                const formats = [
+                    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+                    ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+                    ZXing.BarcodeFormat.QR_CODE
+                ];
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+                const reader = new ZXing.MultiFormatReader();
+                reader.setHints(hints);
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                scanIntervalId = setInterval(() => {
+                    if (isProcessing || !video.srcObject || video.readyState < 2) return;
                     try {
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                         ctx.drawImage(video, 0, 0);
-                        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-                        Html5Qrcode.scanFile(imageData, false)
-                            .then(code => onCodeDetected(code))
-                            .catch(() => {});
-                    } catch(e) { /* silencioso */ }
-                }
-            }, 300); // Revisar cada 300ms
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const lum = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+                        const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+                        const result = reader.decode(bmp);
+                        if (result) onCodeFound(result.getText());
+                    } catch (e) { /* Not Found es normal */ }
+                }, 300);
+            };
+            script.onerror = () => {
+                alert('No se pudo cargar el decodificador de códigos. Usa el ingreso manual.');
+            };
+            document.head.appendChild(script);
         }
 
-        // ══════════ PROCESAMIENTO DE CÓDIGO ══════════
-        async function onCodeDetected(code) {
+        async function onCodeFound(code) {
             if (isProcessing) return;
             isProcessing = true;
 
-            // Feedback visual y háptico
+            // Feedback visual y vibración
             const flash = document.getElementById('flashEl');
-            flash.classList.add('flash-overlay');
+            flash.style.opacity = '1';
+            setTimeout(() => { flash.style.opacity = '0'; }, 400);
             if (navigator.vibrate) navigator.vibrate(150);
-            setTimeout(() => flash.classList.remove('flash-overlay'), 500);
 
-            document.getElementById('statusLabel').textContent = 'Detectado: ' + code;
-
+            document.getElementById('statusLabel').textContent = '✓ ' + code;
             await processCode(code);
 
             setTimeout(() => {
@@ -386,40 +391,39 @@
             }, 2500);
         }
 
+        // ═══════════════════════════════════════
+        // LÓGICA DE NEGOCIO
+        // ═══════════════════════════════════════
         async function processCode(code) {
             let product = null;
-
             if (supabase) {
                 const { data } = await supabase.from('productos').select('*').eq('codigo_barras', code).single();
                 product = data;
             } else {
-                const db = JSON.parse(localStorage.getItem('pos_local') || '[]');
+                const db = JSON.parse(localStorage.getItem('pos_db') || '[]');
                 product = db.find(p => p.codigo_barras === code) || null;
             }
-
-            if (product) {
-                addToCart(product);
-            } else {
-                openModal(code);
-            }
+            if (product) { addToCart(product); }
+            else { openModal(code); }
         }
 
-        // ══════════ CARRITO ══════════
         function addToCart(p) {
-            const ex = cart.find(i => i.id === p.id);
-            if (ex) { ex.qty++; } else { cart.push({ ...p, qty: 1 }); }
+            const existing = cart.find(i => i.id === p.id);
+            if (existing) { existing.qty++; } else { cart.push({ ...p, qty: 1 }); }
             renderCart();
         }
 
         function renderCart() {
             const list = document.getElementById('cartList');
-            const totalEl = document.getElementById('totalVal');
-            const subEl = document.getElementById('subtotalVal');
-            const countEl = document.getElementById('cartCountLabel');
+            const totalEl = document.getElementById('totalEl');
+            const subEl = document.getElementById('subtotalEl');
+            const countEl = document.getElementById('cartCountEl');
 
             if (cart.length === 0) {
-                list.innerHTML = `<div id="emptyState" class="flex flex-col items-center justify-center h-56 opacity-30 text-center">
-                    <svg class="w-20 h-20 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                list.innerHTML = `<div class="flex flex-col items-center justify-center h-56 opacity-25 text-center">
+                    <svg class="w-20 h-20 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                        <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
                     <p class="italic text-sm">El carrito está vacío</p></div>`;
                 totalEl.textContent = '$0.00'; subEl.textContent = '$0.00'; countEl.textContent = '0 items';
                 return;
@@ -430,7 +434,7 @@
                 const sub = item.precio * item.qty;
                 total += sub;
                 return `<div class="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-                    <div class="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center font-black text-accent text-lg">${item.qty}x</div>
+                    <div class="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center font-black text-accent text-lg shrink-0">${item.qty}x</div>
                     <div class="flex-1 min-w-0">
                         <p class="font-bold truncate">${item.nombre}</p>
                         <p class="text-xs font-mono text-muted">${item.codigo_barras}</p>
@@ -442,37 +446,40 @@
                 </div>`;
             }).join('');
 
-            const qty = cart.reduce((a, b) => a + b.qty, 0);
-            countEl.textContent = `${qty} item${qty !== 1 ? 's' : ''}`;
+            const totalQty = cart.reduce((a, b) => a + b.qty, 0);
+            countEl.textContent = `${totalQty} item${totalQty !== 1 ? 's' : ''}`;
             subEl.textContent = `$${total.toFixed(2)}`;
             totalEl.textContent = `$${total.toFixed(2)}`;
         }
 
         function removeItem(i) { cart.splice(i, 1); renderCart(); }
 
-        // ══════════ MODAL ══════════
+        // ═══════════════════════════════════════
+        // MODAL
+        // ═══════════════════════════════════════
         function openModal(code) {
             document.getElementById('codeLabel').textContent = code;
             document.getElementById('modalNew').classList.add('open');
             setTimeout(() => document.getElementById('newName').focus(), 200);
         }
-        function closeModal() { document.getElementById('modalNew').classList.remove('open'); }
+        function closeModal() {
+            document.getElementById('modalNew').classList.remove('open');
+        }
 
         async function saveProduct(e) {
             e.preventDefault();
             const code = document.getElementById('codeLabel').textContent;
             const nombre = document.getElementById('newName').value.trim();
             const precio = parseFloat(document.getElementById('newPrice').value);
-
-            const prod = { id: `local_${Date.now()}`, nombre, precio, codigo_barras: code };
+            const prod = { id: 'local_' + Date.now(), nombre, precio, codigo_barras: code };
 
             if (supabase) {
                 const { data } = await supabase.from('productos').insert([prod]).select().single();
                 if (data) prod.id = data.id;
             } else {
-                const db = JSON.parse(localStorage.getItem('pos_local') || '[]');
+                const db = JSON.parse(localStorage.getItem('pos_db') || '[]');
                 db.push(prod);
-                localStorage.setItem('pos_local', JSON.stringify(db));
+                localStorage.setItem('pos_db', JSON.stringify(db));
             }
 
             addToCart(prod);
@@ -480,29 +487,39 @@
             e.target.reset();
         }
 
-        // ══════════ BÚSQUEDA MANUAL ══════════
+        // ═══════════════════════════════════════
+        // BÚSQUEDA MANUAL
+        // ═══════════════════════════════════════
         function manualSearch() {
             const inp = document.getElementById('manualCode');
             const code = inp.value.trim();
             if (code) { processCode(code); inp.value = ''; }
         }
 
-        // ══════════ FINALIZAR VENTA ══════════
+        // ═══════════════════════════════════════
+        // FINALIZAR VENTA
+        // ═══════════════════════════════════════
         async function finalizeSale() {
             if (cart.length === 0) { alert('El carrito está vacío'); return; }
             const total = cart.reduce((a, b) => a + b.precio * b.qty, 0);
-            if (confirm(`¿Confirmar venta por $${total.toFixed(2)}?`)) {
-                if (supabase) {
-                    const { data: venta } = await supabase.from('ventas').insert([{ total, fecha: new Date().toISOString() }]).select().single();
-                    if (venta) {
-                        const detalles = cart.map(item => ({ venta_id: venta.id, producto_id: item.id, cantidad: item.qty, precio_unitario: item.precio }));
-                        await supabase.from('detalle_venta').insert(detalles);
-                    }
+            if (!confirm(`¿Confirmar venta por $${total.toFixed(2)}?`)) return;
+
+            if (supabase) {
+                const { data: venta } = await supabase
+                    .from('ventas').insert([{ total, fecha: new Date().toISOString() }])
+                    .select().single();
+                if (venta) {
+                    const detalles = cart.map(item => ({
+                        venta_id: venta.id, producto_id: item.id,
+                        cantidad: item.qty, precio_unitario: item.precio
+                    }));
+                    await supabase.from('detalle_venta').insert(detalles);
                 }
-                alert(`✅ Venta completada: $${total.toFixed(2)}`);
-                cart = [];
-                renderCart();
             }
+
+            alert(`✅ ¡Venta completada!\nTotal: $${total.toFixed(2)}`);
+            cart = [];
+            renderCart();
         }
     </script>
 </body>
